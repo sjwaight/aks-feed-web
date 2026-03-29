@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Browse Azure Kubernetes Service (AKS) release notes in a clean, searchable interface." />
+  <title>AKS Release Notes</title>
+
+  <!-- CDN libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+
+  <style>
+    /* ── Design tokens ───────────────────────────────────────────── */
+    :root {
+      --azure-blue:   #0078D4;
+      --azure-dark:   #004E8C;
+      --azure-light:  #EFF6FC;
+      --accent:       #50E6FF;
+      --text:         #1B1B1B;
+      --muted:        #605E5C;
+      --border:       #E1DFDD;
+      --card-bg:      #FFFFFF;
+      --page-bg:      #F3F2F1;
+      --success:      #107C10;
+      --warning:      #D83B01;
+      --radius:       8px;
+      --shadow:       0 2px 8px rgba(0,0,0,.08);
+      --shadow-hover: 0 4px 16px rgba(0,0,0,.14);
+    }
+
+    /* ── Reset / base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--page-bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    a { color: var(--azure-blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    img { max-width: 100%; }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, var(--azure-dark) 0%, var(--azure-blue) 100%);
+      color: #fff;
+      padding: 1.5rem 1rem 3.5rem;
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .header-logo {
+      width: 48px;
+      height: 48px;
+      flex-shrink: 0;
+    }
+    .header-title h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+    .header-title p {
+      font-size: .9rem;
+      opacity: .85;
+      margin-top: .2rem;
+    }
+
+    /* ── Stats bar ────────────────────────────────────────────────── */
+    .stats-bar {
+      max-width: 1200px;
+      margin: -2rem auto 1.5rem;
+      padding: 0 1rem;
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+    .stat-chip {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: .35rem .9rem;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--azure-blue);
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    .stat-chip .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--azure-blue);
+      flex-shrink: 0;
+    }
+
+    /* ── Controls ─────────────────────────────────────────────────── */
+    .controls {
+      max-width: 1200px;
+      margin: 0 auto 1.5rem;
+      padding: 0 1rem;
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .search-wrap {
+      flex: 1 1 280px;
+      position: relative;
+    }
+    .search-wrap svg {
+      position: absolute;
+      left: .75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+    #search {
+      width: 100%;
+      padding: .55rem .75rem .55rem 2.4rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: .92rem;
+      background: var(--card-bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color .15s;
+    }
+    #search:focus { border-color: var(--azure-blue); box-shadow: 0 0 0 2px rgba(0,120,212,.2); }
+
+    .control-select {
+      padding: .55rem .75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: .92rem;
+      background: var(--card-bg);
+      color: var(--text);
+      cursor: pointer;
+      outline: none;
+    }
+    .control-select:focus { border-color: var(--azure-blue); }
+
+    .results-count {
+      font-size: .85rem;
+      color: var(--muted);
+      white-space: nowrap;
+      margin-left: auto;
+    }
+
+    /* ── Main content ─────────────────────────────────────────────── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1rem 3rem;
+    }
+
+    /* ── Release cards ────────────────────────────────────────────── */
+    .releases-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .release-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .release-card:hover {
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-2px);
+    }
+
+    .card-header {
+      padding: 1rem 1.2rem .75rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: .75rem;
+    }
+    .card-date-badge {
+      flex-shrink: 0;
+      text-align: center;
+      background: var(--azure-light);
+      border-radius: 6px;
+      padding: .3rem .5rem;
+      min-width: 52px;
+    }
+    .card-date-badge .month {
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--azure-blue);
+      letter-spacing: .06em;
+    }
+    .card-date-badge .day {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--azure-dark);
+      line-height: 1;
+    }
+    .card-date-badge .year {
+      font-size: .65rem;
+      color: var(--muted);
+    }
+    .card-meta { flex: 1; min-width: 0; }
+    .card-tag {
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--muted);
+      font-family: "Cascadia Code", "Courier New", monospace;
+      background: var(--page-bg);
+      padding: .1rem .4rem;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: .3rem;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .25rem;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: .15rem .5rem;
+      border-radius: 99px;
+      margin-top: .35rem;
+    }
+    .badge-stable  { background: #DFF6DD; color: var(--success); }
+    .badge-prerelease { background: #FDE7E9; color: var(--warning); }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .card-body {
+      padding: 1rem 1.2rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-excerpt {
+      font-size: .87rem;
+      color: var(--muted);
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      line-height: 1.55;
+      flex: 1;
+    }
+    .card-excerpt.expanded {
+      display: block;
+      -webkit-line-clamp: unset;
+    }
+    /* release markdown inside cards */
+    .card-excerpt h1, .card-excerpt h2, .card-excerpt h3 {
+      font-size: .92rem;
+      font-weight: 700;
+      color: var(--azure-dark);
+      margin: .6rem 0 .25rem;
+    }
+    .card-excerpt p  { margin-bottom: .4rem; }
+    .card-excerpt ul, .card-excerpt ol {
+      padding-left: 1.2rem;
+      margin-bottom: .4rem;
+    }
+    .card-excerpt li { margin-bottom: .1rem; }
+    .card-excerpt code {
+      background: var(--page-bg);
+      padding: .1rem .3rem;
+      border-radius: 3px;
+      font-size: .82rem;
+      font-family: "Cascadia Code", monospace;
+    }
+    .card-excerpt pre {
+      background: var(--page-bg);
+      padding: .6rem;
+      border-radius: 5px;
+      overflow-x: auto;
+      margin-bottom: .4rem;
+    }
+    .card-excerpt pre code { background: none; padding: 0; }
+    .card-excerpt a { color: var(--azure-blue); }
+
+    .card-footer {
+      padding: .75rem 1.2rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+    .btn-expand {
+      background: none;
+      border: none;
+      font-size: .8rem;
+      color: var(--azure-blue);
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: .25rem;
+    }
+    .btn-expand:hover { text-decoration: underline; }
+    .btn-link {
+      font-size: .8rem;
+      color: var(--azure-blue);
+      display: flex;
+      align-items: center;
+      gap: .25rem;
+    }
+
+    /* ── Load-more ────────────────────────────────────────────────── */
+    .load-more-wrap {
+      text-align: center;
+      margin-top: 2rem;
+    }
+    .btn-load-more {
+      background: var(--azure-blue);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: .65rem 2rem;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-load-more:hover { background: var(--azure-dark); }
+    .btn-load-more:disabled { background: var(--border); cursor: default; }
+
+    /* ── State views ──────────────────────────────────────────────── */
+    .state-view {
+      text-align: center;
+      padding: 4rem 1rem;
+      display: none;
+    }
+    .state-view.active { display: block; }
+    .state-icon { font-size: 3rem; margin-bottom: 1rem; }
+    .state-view h2 { font-size: 1.3rem; color: var(--text); margin-bottom: .5rem; }
+    .state-view p { color: var(--muted); max-width: 400px; margin: 0 auto .5rem; }
+    .state-view .btn-retry {
+      margin-top: 1rem;
+      background: var(--azure-blue);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: .55rem 1.5rem;
+      font-size: .9rem;
+      cursor: pointer;
+    }
+
+    /* ── Skeleton loader ──────────────────────────────────────────── */
+    .skeleton-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 1.25rem;
+    }
+    .skeleton-card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.2rem;
+      height: 200px;
+    }
+    .skeleton-line {
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+      margin-bottom: .75rem;
+    }
+    .skeleton-line.short  { width: 40%; height: 12px; }
+    .skeleton-line.medium { width: 70%; height: 14px; }
+    .skeleton-line.long   { width: 100%; height: 12px; }
+    @keyframes shimmer {
+      0%   { background-position:  200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    footer {
+      background: var(--azure-dark);
+      color: rgba(255,255,255,.7);
+      text-align: center;
+      padding: 1.25rem 1rem;
+      font-size: .82rem;
+    }
+    footer a { color: var(--accent); }
+
+    /* ── Responsive ───────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .header-title h1 { font-size: 1.25rem; }
+      .releases-grid, .skeleton-grid { grid-template-columns: 1fr; }
+      .results-count { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-inner">
+    <!-- Azure Kubernetes Service icon (inline SVG) -->
+    <svg class="header-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#50E6FF" opacity=".18"/>
+      <path d="M24 8C15.163 8 8 15.163 8 24s7.163 16 16 16 16-7.163 16-16S32.837 8 24 8z" fill="#50E6FF"/>
+      <path d="M24 12c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12z" fill="#0078D4"/>
+      <path d="M20 18l8 6-8 6V18z" fill="#fff"/>
+    </svg>
+    <div class="header-title">
+      <h1>AKS Release Notes</h1>
+      <p>Azure Kubernetes Service — latest updates, announcements &amp; patches</p>
+    </div>
+  </div>
+</header>
+
+<!-- ── Stats bar ────────────────────────────────────────────────────── -->
+<div class="stats-bar" id="stats-bar" aria-live="polite"></div>
+
+<!-- ── Controls ─────────────────────────────────────────────────────── -->
+<div class="controls">
+  <div class="search-wrap">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input id="search" type="search" placeholder="Search release notes…" aria-label="Search release notes" autocomplete="off" />
+  </div>
+
+  <select id="filter-type" class="control-select" aria-label="Filter by release type">
+    <option value="all">All releases</option>
+    <option value="stable">Stable only</option>
+    <option value="prerelease">Pre-release only</option>
+  </select>
+
+  <select id="sort-order" class="control-select" aria-label="Sort order">
+    <option value="newest">Newest first</option>
+    <option value="oldest">Oldest first</option>
+  </select>
+
+  <span class="results-count" id="results-count" aria-live="polite"></span>
+</div>
+
+<!-- ── Main ─────────────────────────────────────────────────────────── -->
+<main>
+  <!-- Skeleton loader -->
+  <div id="skeleton" class="skeleton-grid" aria-hidden="true">
+    <!-- 6 placeholder cards rendered by JS -->
+  </div>
+
+  <!-- Releases grid -->
+  <div id="releases-grid" class="releases-grid" role="list"></div>
+
+  <!-- Load more -->
+  <div class="load-more-wrap" id="load-more-wrap" style="display:none">
+    <button class="btn-load-more" id="btn-load-more">Load more releases</button>
+  </div>
+
+  <!-- Empty / error states -->
+  <div class="state-view" id="state-empty">
+    <div class="state-icon">🔍</div>
+    <h2>No releases found</h2>
+    <p>Try adjusting your search terms or filters.</p>
+  </div>
+
+  <div class="state-view" id="state-error">
+    <div class="state-icon">⚠️</div>
+    <h2>Could not load releases</h2>
+    <p id="error-message">An error occurred while fetching the latest AKS release notes.</p>
+    <button class="btn-retry" onclick="init()">Try again</button>
+  </div>
+</main>
+
+<!-- ── Footer ────────────────────────────────────────────────────────── -->
+<footer>
+  Data sourced from the
+  <a href="https://github.com/Azure/AKS/releases" target="_blank" rel="noopener">Azure/AKS GitHub releases</a>
+  via the GitHub API. •
+  <a href="https://releases.aks.azure.com/" target="_blank" rel="noopener">AKS Release Tracker</a>
+  •
+  <a href="https://learn.microsoft.com/azure/aks/" target="_blank" rel="noopener">AKS Docs</a>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ──────────────────────────────────────────────────────────
+  const API_URL    = 'https://api.github.com/repos/Azure/AKS/releases?per_page=100';
+  const PAGE_SIZE  = 12;   // cards visible at once
+
+  // ── State ───────────────────────────────────────────────────────────
+  let allReleases  = [];   // full dataset from API
+  let filtered     = [];   // after search + filter
+  let visibleCount = PAGE_SIZE;
+
+  // ── DOM refs ────────────────────────────────────────────────────────
+  const skeletonEl     = document.getElementById('skeleton');
+  const gridEl         = document.getElementById('releases-grid');
+  const loadMoreWrap   = document.getElementById('load-more-wrap');
+  const btnLoadMore    = document.getElementById('btn-load-more');
+  const statsBar       = document.getElementById('stats-bar');
+  const searchEl       = document.getElementById('search');
+  const filterTypeEl   = document.getElementById('filter-type');
+  const sortOrderEl    = document.getElementById('sort-order');
+  const resultsCount   = document.getElementById('results-count');
+  const stateEmpty     = document.getElementById('state-empty');
+  const stateError     = document.getElementById('state-error');
+  const errorMessage   = document.getElementById('error-message');
+
+  // ── Skeleton ────────────────────────────────────────────────────────
+  function showSkeleton() {
+    skeletonEl.innerHTML = Array.from({length: 6}, () => `
+      <div class="skeleton-card" aria-hidden="true">
+        <div class="skeleton-line short"></div>
+        <div class="skeleton-line medium" style="margin-bottom:1rem"></div>
+        <div class="skeleton-line long"></div>
+        <div class="skeleton-line long"></div>
+        <div class="skeleton-line medium"></div>
+      </div>`).join('');
+    skeletonEl.style.display = 'grid';
+  }
+
+  function hideSkeleton() {
+    skeletonEl.style.display = 'none';
+    skeletonEl.innerHTML = '';
+  }
+
+  // ── Fetch ───────────────────────────────────────────────────────────
+  async function fetchAllReleases() {
+    const pages = [];
+    let page = 1;
+
+    while (true) {
+      const res = await fetch(`${API_URL}&page=${page}`, {
+        headers: { Accept: 'application/vnd.github+json' }
+      });
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 429) {
+          throw new Error('GitHub API rate limit reached. Please wait a few minutes and try again.');
+        }
+        throw new Error(`GitHub API responded with status ${res.status}.`);
+      }
+      const data = await res.json();
+      pages.push(...data);
+      if (data.length < 100) break;  // last page
+      page++;
+    }
+    return pages;
+  }
+
+  // ── Date helpers ────────────────────────────────────────────────────
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function parseDateParts(iso) {
+    const d = new Date(iso);
+    return { month: MONTHS[d.getUTCMonth()], day: d.getUTCDate(), year: d.getUTCFullYear() };
+  }
+  function relativeTime(iso) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7)  return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days/7)} week${days>=14?'s':''} ago`;
+    if (days < 365) return `${Math.floor(days/30)} month${days>=60?'s':''} ago`;
+    return `${Math.floor(days/365)} year${days>=730?'s':''} ago`;
+  }
+
+  // ── Render helpers ──────────────────────────────────────────────────
+  function escapeAttr(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function renderBody(markdown) {
+    if (!markdown) return '<em>No release notes provided.</em>';
+    const raw = marked.parse(markdown);
+    return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } });
+  }
+
+  function buildCard(release) {
+    const { month, day, year } = parseDateParts(release.published_at);
+    const relative  = relativeTime(release.published_at);
+    const isPreRel  = release.prerelease;
+    const bodyHtml  = renderBody(release.body);
+    const tagSafe   = escapeAttr(release.tag_name);
+    const titleSafe = escapeAttr(release.name || release.tag_name);
+    const urlSafe   = escapeAttr(release.html_url);
+    const idSafe    = `card-${escapeAttr(release.id)}`;
+
+    return `
+    <article class="release-card" role="listitem" id="${idSafe}">
+      <div class="card-header">
+        <div class="card-date-badge" aria-label="Released ${month} ${day}, ${year}">
+          <div class="month">${month}</div>
+          <div class="day">${day}</div>
+          <div class="year">${year}</div>
+        </div>
+        <div class="card-meta">
+          <span class="card-tag">${tagSafe}</span>
+          <div class="card-title">${titleSafe}</div>
+          <span class="badge ${isPreRel ? 'badge-prerelease' : 'badge-stable'}">
+            <span class="badge-dot"></span>
+            ${isPreRel ? 'Pre-release' : 'Stable'}
+          </span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-excerpt" id="excerpt-${idSafe}">${bodyHtml}</div>
+      </div>
+      <div class="card-footer">
+        <button class="btn-expand"
+          onclick="toggleExpand('excerpt-${idSafe}', this)"
+          aria-expanded="false"
+          aria-controls="excerpt-${idSafe}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+          Show more
+        </button>
+        <span style="font-size:.78rem;color:var(--muted)">${relative}</span>
+        <a class="btn-link"
+           href="${urlSafe}"
+           target="_blank"
+           rel="noopener noreferrer"
+           aria-label="View ${titleSafe} on GitHub">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </article>`;
+  }
+
+  // ── Expand / collapse ────────────────────────────────────────────────
+  window.toggleExpand = function(excerptId, btn) {
+    const el = document.getElementById(excerptId);
+    if (!el) return;
+    const expanded = el.classList.toggle('expanded');
+    btn.setAttribute('aria-expanded', expanded);
+    const icon = btn.querySelector('svg');
+    icon.style.transform = expanded ? 'rotate(180deg)' : '';
+    btn.childNodes[btn.childNodes.length - 1].textContent = expanded ? ' Show less' : ' Show more';
+  };
+
+  // ── Render grid ──────────────────────────────────────────────────────
+  function renderGrid() {
+    const slice = filtered.slice(0, visibleCount);
+    gridEl.innerHTML = slice.map(buildCard).join('');
+
+    stateEmpty.classList.toggle('active', filtered.length === 0);
+    stateError.classList.remove('active');
+
+    const remaining = filtered.length - visibleCount;
+    if (remaining > 0) {
+      loadMoreWrap.style.display = 'block';
+      btnLoadMore.textContent    = `Load ${Math.min(remaining, PAGE_SIZE)} more releases`;
+      btnLoadMore.disabled       = false;
+    } else {
+      loadMoreWrap.style.display = 'none';
+    }
+
+    resultsCount.textContent =
+      `${filtered.length} of ${allReleases.length} release${allReleases.length !== 1 ? 's' : ''}`;
+  }
+
+  // ── Filter / search ──────────────────────────────────────────────────
+  function applyFilters() {
+    const query = searchEl.value.trim().toLowerCase();
+    const type  = filterTypeEl.value;
+    const sort  = sortOrderEl.value;
+
+    filtered = allReleases.filter(r => {
+      if (type === 'stable'     && r.prerelease) return false;
+      if (type === 'prerelease' && !r.prerelease) return false;
+      if (query) {
+        const haystack = `${r.name} ${r.tag_name} ${r.body || ''}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      const ta = new Date(a.published_at).getTime();
+      const tb = new Date(b.published_at).getTime();
+      return sort === 'newest' ? tb - ta : ta - tb;
+    });
+
+    visibleCount = PAGE_SIZE;
+    renderGrid();
+  }
+
+  // ── Stats bar ────────────────────────────────────────────────────────
+  function renderStats() {
+    if (!allReleases.length) return;
+    const latest    = allReleases[0];
+    const stableRel = allReleases.filter(r => !r.prerelease);
+    const preRelCnt = allReleases.filter(r => r.prerelease).length;
+
+    // Extract Kubernetes versions mentioned in the latest release body
+    const k8sVersions = [];
+    if (latest.body) {
+      const m = latest.body.match(/\b1\.\d{2,3}(?:\.\d+)?\b/g);
+      if (m) k8sVersions.push(...[...new Set(m)].slice(0, 4));
+    }
+
+    statsBar.innerHTML = [
+      chip('📦', `${allReleases.length} total releases`),
+      stableRel.length ? chip('✅', `Latest stable: ${escapeAttr(stableRel[0].tag_name)}`) : '',
+      preRelCnt        ? chip('🧪', `${preRelCnt} pre-release${preRelCnt !== 1 ? 's' : ''}`) : '',
+      ...k8sVersions.map(v => chip('☸', `k8s ${escapeAttr(v)}`)),
+    ].join('');
+  }
+
+  function chip(icon, text) {
+    return `<div class="stat-chip"><span>${icon}</span> ${text}</div>`;
+  }
+
+  // ── Event listeners ──────────────────────────────────────────────────
+  searchEl.addEventListener('input',  applyFilters);
+  filterTypeEl.addEventListener('change', applyFilters);
+  sortOrderEl.addEventListener('change',  applyFilters);
+  btnLoadMore.addEventListener('click', () => {
+    visibleCount += PAGE_SIZE;
+    renderGrid();
+    // scroll new cards into view
+    const cards = gridEl.querySelectorAll('.release-card');
+    if (cards[visibleCount - PAGE_SIZE]) {
+      cards[visibleCount - PAGE_SIZE].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  });
+
+  // ── Init ─────────────────────────────────────────────────────────────
+  async function init() {
+    showSkeleton();
+    gridEl.innerHTML = '';
+    stateEmpty.classList.remove('active');
+    stateError.classList.remove('active');
+    statsBar.innerHTML = '';
+    loadMoreWrap.style.display = 'none';
+
+    try {
+      allReleases = await fetchAllReleases();
+      hideSkeleton();
+      renderStats();
+      applyFilters();
+    } catch (err) {
+      hideSkeleton();
+      errorMessage.textContent = err.message;
+      stateError.classList.add('active');
+    }
+  }
+
+  // Expose for retry button
+  window.init = init;
+
+  init();
+})();
+</script>
+</body>
+</html>
