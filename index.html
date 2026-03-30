@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Browse Azure Kubernetes Service (AKS) release notes in a clean, searchable interface." />
-  <title>AKS Release Notes</title>
+  <meta name="description" content="Unofficial viewer for Azure Kubernetes Service (AKS) release notes. Not affiliated with or endorsed by Microsoft." />
+  <title>AKS Release Notes (Unofficial)</title>
 
   <!-- CDN libraries (pinned versions with Subresource Integrity for supply-chain safety) -->
   <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"
@@ -72,6 +72,15 @@
       font-size: .9rem;
       opacity: .85;
       margin-top: .2rem;
+    }
+    .header-unofficial {
+      font-size: .78rem;
+      opacity: .75;
+      margin-top: .4rem;
+      background: rgba(255,255,255,.15);
+      display: inline-block;
+      padding: .15rem .6rem;
+      border-radius: 4px;
     }
 
     /* ── Stats bar ────────────────────────────────────────────────── */
@@ -404,6 +413,7 @@
       font-size: .82rem;
     }
     footer a { color: var(--accent); }
+    footer p { margin-bottom: .5rem; color: rgba(255,255,255,.85); }
 
     /* ── Responsive ───────────────────────────────────────────────── */
     @media (max-width: 600px) {
@@ -428,6 +438,7 @@
     <div class="header-title">
       <h1>AKS Release Notes</h1>
       <p>Azure Kubernetes Service — latest updates, announcements &amp; patches</p>
+      <p class="header-unofficial">⚠️ Unofficial viewer — not affiliated with or endorsed by Microsoft</p>
     </div>
   </div>
 </header>
@@ -490,6 +501,7 @@
 
 <!-- ── Footer ────────────────────────────────────────────────────────── -->
 <footer>
+  <p>⚠️ This is an <strong>unofficial</strong> site and is not affiliated with, endorsed by, or maintained by Microsoft.</p>
   Data sourced from the
   <a href="https://github.com/Azure/AKS/releases" target="_blank" rel="noopener">Azure/AKS GitHub releases</a>
   via the GitHub API. •
